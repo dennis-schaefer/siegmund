@@ -3,8 +3,9 @@ import { readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import type { EligibilityResult } from "./eligibility.js";
 import type { IssueRef, SubIssue } from "./github.js";
-import { formatInventory } from "./planner.js";
+import { formatPlanInventory } from "./planner.js";
 import { paths } from "./worktree.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -40,11 +41,11 @@ function runClaude(
 
 export async function runPlanningPhase(
   prd: IssueRef,
-  subs: SubIssue[],
+  eligibility: EligibilityResult,
   model: string,
 ): Promise<void> {
   const systemPrompt = await readPrompt("plan.md");
-  const inventory = formatInventory(subs);
+  const inventory = formatPlanInventory(eligibility);
   const userMessage = [
     `# PRD #${prd.number} — ${prd.title}`,
     "",

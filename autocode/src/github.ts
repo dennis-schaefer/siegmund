@@ -11,6 +11,22 @@ export interface SubIssue extends IssueRef {
   blockedBy: number[];
 }
 
+/** State of every issue in the repo, keyed by issue number. Used to classify
+ *  blockers (closed = done) regardless of whether they belong to the PRD. */
+export type IssueState = "open" | "closed";
+
+export interface IssueStatus {
+  state: IssueState;
+  labels: string[];
+}
+
+export type IssueStateMap = Map<number, IssueStatus>;
+
+export interface SubIssueFetch {
+  subs: SubIssue[];
+  issueState: IssueStateMap;
+}
+
 interface GithubConfig {
   token: string;
   owner: string;
@@ -71,7 +87,7 @@ function parseBlockedBy(body: string): number[] {
 }
 
 function isChildOfPrd(body: string, prdNumber: number): boolean {
-  const pattern = new RegExp(`##\\s*Parent PRD\\s*\\n\\s*#${prdNumber}\\b`, "i");
+  const pattern = new RegExp(`##\\s*Parent\\s*\\n\\s*#${prdNumber}\\b`, "i");
   return pattern.test(body);
 }
 
@@ -79,27 +95,36 @@ export async function fetchSubIssues(
   client: Octokit,
   cfg: GithubConfig,
   prdNumber: number,
-): Promise<SubIssue[]> {
+): Promise<SubIssueFetch> {
+  // Fetch every issue (open and closed): closed issues are not candidates, but
+  // we need their state to recognise a closed blocker as "done".
   const all = await client.paginate(client.issues.listForRepo, {
     owner: cfg.owner,
     repo: cfg.repo,
-    state: "open",
+    state: "all",
     per_page: 100,
   });
 
+  const issueState: IssueStateMap = new Map();
   const subs: SubIssue[] = [];
   for (const raw of all) {
     if (raw.pull_request) continue;
+    const labels = extractLabels(raw.labels);
+    issueState.set(raw.number, {
+      state: raw.state === "closed" ? "closed" : "open",
+      labels,
+    });
     if (raw.number === prdNumber) continue;
+    if (raw.state === "closed") continue;
     const body = raw.body ?? "";
     if (!isChildOfPrd(body, prdNumber)) continue;
     subs.push({
       number: raw.number,
       title: raw.title,
       body,
-      labels: extractLabels(raw.labels),
+      labels,
       blockedBy: parseBlockedBy(body),
     });
   }
-  return subs;
+  return { subs, issueState };
 }

@@ -1,3 +1,4 @@
+import type { EligibilityResult } from "./eligibility.js";
 import type { SubIssue } from "./github.js";
 
 export interface PlanResult {
@@ -71,15 +72,27 @@ export function topologicalSort(issues: SubIssue[]): PlanResult {
   return { order, dangling };
 }
 
+function inventoryLine(issue: SubIssue, status: string): string {
+  const labels = issue.labels.length > 0 ? issue.labels.join(", ") : "—";
+  const blockedBy =
+    issue.blockedBy.length > 0
+      ? issue.blockedBy.map((n) => `#${n}`).join(", ")
+      : "none";
+  return `#${issue.number} — ${issue.title} [labels: ${labels}] — blocked by: ${blockedBy} — status: ${status}`;
+}
+
 export function formatInventory(issues: SubIssue[]): string {
-  return issues
-    .map((i) => {
-      const labels = i.labels.length > 0 ? i.labels.join(", ") : "—";
-      const blockedBy =
-        i.blockedBy.length > 0
-          ? i.blockedBy.map((n) => `#${n}`).join(", ")
-          : "none";
-      return `#${i.number} — ${i.title} [labels: ${labels}] — blocked by: ${blockedBy}`;
-    })
-    .join("\n");
+  return issues.map((i) => inventoryLine(i, "runnable")).join("\n");
+}
+
+/** Inventory of all `ready-for-agent` issues, each marked runnable or
+ *  held-back with the reason, for the planning agent. */
+export function formatPlanInventory(eligibility: EligibilityResult): string {
+  const lines = [
+    ...eligibility.runnable.map((i) => inventoryLine(i, "runnable")),
+    ...eligibility.heldBack.map((h) =>
+      inventoryLine(h.issue, `held-back (${h.reasons.join("; ")})`),
+    ),
+  ];
+  return lines.join("\n");
 }

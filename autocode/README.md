@@ -20,6 +20,14 @@ No code is pushed or PR'd automatically — the user reviews and pushes manually
 Autocode relies on the same issue template that the rest of the project already
 uses:
 
+- A sub-issue is only implemented when it carries the **`ready-for-agent`**
+  label **and** every issue it is blocked by is already **closed** (done = closed
+  on GitHub). Otherwise it is *held back*: autocode skips it, reports why, and
+  carries on with the issues that are runnable. Hold-back is transitive — if a
+  ready issue depends on another ready issue that is itself held back, both wait.
+  An open blocker that is *also* `ready-for-agent` counts as satisfied because it
+  is implemented earlier in the same run.
+
 - The **PRD issue** is a regular issue describing the feature at high level
   (usually labelled `PRD`).
 - Each **sub-issue** must contain these two sections in its body:
@@ -194,21 +202,24 @@ docker compose run --rm autocode agent run --issue 5
 
 What happens, in order:
 
-1. Fetch PRD `#5` and all open issues whose body references it as
-   `## Parent PRD\n#5`.
-2. Run the planning agent.
-3. Create a git worktree at `/workspace` (inside the container) on a new
+1. Fetch PRD `#5` and all issues whose body references it as `## Parent PRD\n#5`
+   (closed issues included, so autocode knows which blockers are already done).
+2. Keep only the `ready-for-agent` sub-issues whose blockers are all closed;
+   hold the rest back and report them.
+3. Run the planning agent.
+4. Create a git worktree at `/workspace` (inside the container) on a new
    branch `feat/5-<slug-of-prd-title>` derived from `main`. The branch is
    immediately visible on the host because the `.git` object store is shared.
-4. For each sub-issue in topological order:
+   (Skipped if no issue is runnable — autocode exits cleanly after planning.)
+5. For each runnable sub-issue in topological order:
    - Compose the system prompt (`basic.md` + optional `backend.md` /
      `frontend.md`).
    - Run `claude --print --system-prompt <composed> <issue title + body>`.
    - `git add -A && git commit -m "feat: <issue title> (closes #N)"`.
    - `gh issue close N --comment "Implemented in branch ..."` against your repo.
-5. Run the review agent on the full `main...HEAD` diff. The report is printed
+6. Run the review agent on the full `main...HEAD` diff. The report is printed
    to your terminal.
-6. Remove the worktree (the branch and its commits remain).
+7. Remove the worktree (the branch and its commits remain).
 
 ### Inspecting the result on the host
 
@@ -280,30 +291,3 @@ This happens only if the container was killed mid-run. Clean up with
 Autocode trusts the `## Blocked by` references in the issue bodies. If the
 order looks wrong, fix the references in GitHub, not in the code.
 
----
-
-## Files in this directory
-
-```
-autocode/
-├── Dockerfile              # Container image: Java 25 + Node 24 + git + gh + claude
-├── docker-compose.yml      # Volume mounts and env wiring
-├── .env.example            # Template for GITHUB_TOKEN, GITHUB_REPO, REPO_PATH
-├── package.json            # commander, @octokit/rest, zod, tsx, typescript
-├── tsconfig.json           # Strict TS, NodeNext, ES2022
-├── src/
-│   ├── index.ts            # CLI entrypoint
-│   ├── github.ts           # Octokit wrapper + PRD/blocked-by parsing
-│   ├── planner.ts          # Kahn topological sort
-│   ├── runner.ts           # Plan / implement / review phases
-│   └── worktree.ts         # git worktree lifecycle
-└── prompts/
-    ├── plan.md             # Planning agent system prompt
-    ├── basic.md            # Universal TDD instructions
-    ├── backend.md          # Java / Spring Boot rules (appended on `backend` label)
-    ├── frontend.md         # TypeScript / React rules (appended on `frontend` label)
-    └── review.md           # Review agent system prompt
-```
-
-For the full design rationale behind each of these choices, read `PLAN.md`
-in this directory.

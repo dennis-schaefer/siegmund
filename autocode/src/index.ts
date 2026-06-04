@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { Command } from "commander";
 
+import { computeEligibility } from "./eligibility.js";
 import {
   createClient,
   fetchPrdIssue,
@@ -55,13 +56,31 @@ agent
     const prd = await fetchPrdIssue(client, cfg, opts.issue);
 
     console.error(`[autocode] fetching sub-issues for PRD #${prd.number}…`);
-    const subsRaw = await fetchSubIssues(client, cfg, prd.number);
-    if (subsRaw.length === 0) {
-      console.error(`[autocode] no sub-issues found for PRD #${prd.number}.`);
-      process.exit(1);
+    const { subs, issueState } = await fetchSubIssues(client, cfg, prd.number);
+    if (subs.length === 0) {
+      console.error(`[autocode] no open sub-issues found for PRD #${prd.number}.`);
+      return;
     }
 
-    const { order, dangling } = topologicalSort(subsRaw);
+    // Keep only ready-for-agent issues whose blockers are done; report the rest.
+    const eligibility = computeEligibility(subs, issueState);
+    for (const w of eligibility.warnings) {
+      console.error(`[autocode] WARNING — ${w}`);
+    }
+    for (const h of eligibility.heldBack) {
+      console.error(
+        `[autocode] held back: #${h.issue.number} — ${h.issue.title} (${h.reasons.join("; ")})`,
+      );
+    }
+
+    if (eligibility.runnable.length === 0 && eligibility.heldBack.length === 0) {
+      console.error(
+        `[autocode] no ready-for-agent issues for PRD #${prd.number}.`,
+      );
+      return;
+    }
+
+    const { order, dangling } = topologicalSort(eligibility.runnable);
     if (dangling.length > 0) {
       for (const d of dangling) {
         console.error(
@@ -73,10 +92,17 @@ agent
     }
 
     console.error(`[autocode] planning phase (model: ${model})…`);
-    await runPlanningPhase(prd, order, model);
+    await runPlanningPhase(prd, eligibility, model);
 
     if (opts.dryRun) {
       console.error("[autocode] dry-run complete — exiting before worktree creation.");
+      return;
+    }
+
+    if (order.length === 0) {
+      console.error(
+        "[autocode] nothing runnable — all ready issues are held back. Exiting before worktree creation.",
+      );
       return;
     }
 

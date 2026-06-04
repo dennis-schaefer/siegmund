@@ -3,9 +3,9 @@
 You are implementing a backend issue. In addition to the universal TDD workflow above, follow these rules.
 
 ### Module boundaries (Spring Modulith)
-- Source packages live under `io.interfero.<module>` (e.g. `io.interfero.auth`, `io.interfero.cluster`).
+- Source packages live under `ai.siegmund.<module>` (e.g. `ai.siegmund.auth`, `ai.siegmund.skills`).
 - Cross-module access goes through published API packages only. Never reach into another module's internal packages.
-- If you need a new module, create it under `io.interfero.<name>` with `package-info.java` declaring `@ApplicationModule`.
+- If you need a new module, create it under `ai.siegmund.<name>` with `package-info.java` declaring `@ApplicationModule`.
 
 ### Tests
 - **Unit tests** for pure logic — JUnit 5, AssertJ, no Spring context.
@@ -28,7 +28,7 @@ You are implementing a backend issue. In addition to the universal TDD workflow 
 - JPA entities are mutable by necessity, but expose them only through repository/service boundaries; never return entities directly from controllers.
 
 ### HTTP
-- Controllers under `<module>.api`. DTOs are records with explicit field validation (`@NotBlank`, `@Email`, etc.).
+- Controllers under `<module>.controlles`. DTOs are records with explicit field validation (`@NotBlank`, `@Email`, etc.).
 - Map exceptions to HTTP responses with `@RestControllerAdvice`, never throw raw `RuntimeException` from a controller.
 
 ### Build
