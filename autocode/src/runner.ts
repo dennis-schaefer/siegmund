@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 import type { EligibilityResult } from "./eligibility.js";
 import type { IssueRef, SubIssue } from "./github.js";
 import { formatPlanInventory } from "./planner.js";
+import { createStreamRenderer } from "./stream.js";
 import { paths } from "./worktree.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -24,14 +25,35 @@ function runClaude(
   return new Promise((resolveP, rejectP) => {
     const child = spawn(
       "claude",
-      ["--print", "--model", model, "--system-prompt", systemPrompt],
+      [
+        "--print",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        // Autonomous agent in an isolated container — bypass the interactive
+        // permission prompts that headless mode cannot answer.
+        "--dangerously-skip-permissions",
+        "--model",
+        model,
+        "--system-prompt",
+        systemPrompt,
+      ],
       {
         cwd,
-        stdio: ["pipe", "inherit", "inherit"],
+        stdio: ["pipe", "pipe", "inherit"],
+        // Claude Code refuses --dangerously-skip-permissions as root unless it
+        // detects a sandbox. The container runs as root, so signal it.
+        env: { ...process.env, IS_SANDBOX: "1" },
       },
     );
+
+    const renderer = createStreamRenderer();
+    child.stdout.setEncoding("utf8");
+    child.stdout.on("data", (chunk: string) => renderer.write(chunk));
+
     child.on("error", rejectP);
     child.on("exit", (code) => {
+      renderer.finish();
       if (code === 0) resolveP();
       else rejectP(new Error(`claude exited with code ${code}`));
     });
