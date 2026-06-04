@@ -1,0 +1,13 @@
+services:
+  autocode:
+    build: .
+    image: autocode:latest
+    env_file:
+      - .env
+    volumes:
+      - ${REPO_PATH}:/repo
+      - ${HOME:-${USERPROFILE}}/.claude.json:/root/.claude.json
+      - ${HOME:-${USERPROFILE}}/.claude:/root/.claude
+    working_dir: /workspace
+    tty: true
+    stdin_open: true
