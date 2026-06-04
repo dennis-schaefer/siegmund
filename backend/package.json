@@ -1,0 +1,17 @@
+{
+  "name": "@siegmund/backend",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "start": "node --experimental-strip-types src/index.ts",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@siegmund/shared": "workspace:*",
+    "fastify": "^5.1.0"
+  }
+}

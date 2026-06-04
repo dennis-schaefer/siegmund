@@ -5,3 +5,9 @@
 # Maven
 target/
 .mvn/wrapper/maven-wrapper.jar
+
+# Node
+node_modules/
+dist/
+coverage/
+*.log
