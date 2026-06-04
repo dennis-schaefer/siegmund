@@ -76,7 +76,22 @@ export function commitAll(message: string): string {
   if (status.stdout.trim().length === 0) {
     throw new Error("Nothing to commit — Claude exited without changes.");
   }
-  const commit = run(["-C", WORKTREE_PATH, "commit", "-m", message]);
+  // The container has no git identity and host ~/.gitconfig is not mounted, so
+  // inject a configurable bot identity via `-c` (overrides any config file and
+  // needs no write access to .git/config).
+  const authorName = process.env.AUTOCODE_GIT_NAME?.trim() || "autocode";
+  const authorEmail = process.env.AUTOCODE_GIT_EMAIL?.trim() || "autocode@local";
+  const commit = run([
+    "-C",
+    WORKTREE_PATH,
+    "-c",
+    `user.name=${authorName}`,
+    "-c",
+    `user.email=${authorEmail}`,
+    "commit",
+    "-m",
+    message,
+  ]);
   if (commit.code !== 0) {
     throw new Error(`git commit failed: ${commit.stderr}`);
   }
