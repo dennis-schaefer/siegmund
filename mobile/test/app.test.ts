@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { appName, buildCaptureDraft } from '../src/index.js';
+import { appName, buildCaptureDraft } from '../src';
 
 describe('mobile placeholder', () => {
   it('exposes the app name', () => {
