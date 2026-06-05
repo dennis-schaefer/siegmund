@@ -2,6 +2,11 @@
 .idea/
 *.iml
 
+# Node
+node_modules/
+*/node_modules/
+*/dist
+
 # Maven
 target/
 .mvn/wrapper/maven-wrapper.jar
