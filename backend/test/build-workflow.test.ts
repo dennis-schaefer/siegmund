@@ -49,4 +49,26 @@ describe('build.yml workflow', () => {
   it('uses gha docker layer caching', () => {
     expect(readWorkflow()).toContain('type=gha');
   });
+
+  it('also triggers on push of v* tags', () => {
+    expect(readWorkflow()).toMatch(/tags:[\s\S]*?v\*/);
+  });
+
+  it('tags semver releases as a v-prefixed version', () => {
+    expect(readWorkflow()).toMatch(/type=semver,pattern=v\{\{version\}\}/);
+  });
+
+  it('applies latest only on release tags via latest=auto', () => {
+    expect(readWorkflow()).toContain('latest=auto');
+  });
+
+  it('builds releases even when the tagged commit did not touch backend paths', () => {
+    expect(readWorkflow()).toMatch(/startsWith\(github\.ref, 'refs\/tags\/v'\)/);
+  });
+
+  it('keeps edge bound to main pushes only, never to release tags', () => {
+    expect(readWorkflow()).toMatch(
+      /value=edge,enable=\$\{\{ github\.ref == 'refs\/heads\/main' \}\}/,
+    );
+  });
 });
