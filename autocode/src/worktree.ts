@@ -1,4 +1,5 @@
 import { spawnSync } from "node:child_process";
+import { rmSync } from "node:fs";
 
 const REPO_PATH = "/repo";
 const WORKTREE_PATH = "/workspace";
@@ -25,8 +26,54 @@ export function branchName(prdNumber: number, prdTitle: string): string {
   return `feat/${prdNumber}-${slugify(prdTitle)}`;
 }
 
+/**
+ * Returns the branch checked out by the worktree registered at `path`:
+ *   - `null`  → no worktree is registered at that path
+ *   - `""`    → registered, but on a detached HEAD
+ *   - branch  → registered on that branch (short name)
+ */
+function worktreeBranchAt(path: string): string | null {
+  const result = run(["-C", REPO_PATH, "worktree", "list", "--porcelain"]);
+  if (result.code !== 0) return null;
+  // Porcelain output is newline-delimited records separated by a blank line.
+  for (const block of result.stdout.split("\n\n")) {
+    const lines = block.split("\n");
+    const wt = lines
+      .find((l) => l.startsWith("worktree "))
+      ?.slice("worktree ".length);
+    if (wt !== path) continue;
+    const br = lines
+      .find((l) => l.startsWith("branch "))
+      ?.slice("branch ".length);
+    if (!br) return ""; // registered but detached
+    return br.replace(/^refs\/heads\//, "");
+  }
+  return null;
+}
+
 export function createWorktree(branch: string): void {
-  // Make sure the worktree path is free.
+  // The worktree registration in /repo/.git survives across container runs even
+  // when /workspace itself does not. If a worktree is already registered at the
+  // path, reuse it instead of aborting.
+  const current = worktreeBranchAt(WORKTREE_PATH);
+  if (current !== null) {
+    if (current !== branch) {
+      // Point the existing worktree at the branch we need (create from main if
+      // it does not exist yet). Any uncommitted changes are left untouched.
+      let res = run(["-C", WORKTREE_PATH, "checkout", branch]);
+      if (res.code !== 0) {
+        res = run(["-C", WORKTREE_PATH, "checkout", "-b", branch, "main"]);
+        if (res.code !== 0) {
+          throw new Error(
+            `Failed to switch worktree to ${branch}: ${res.stderr}`,
+          );
+        }
+      }
+    }
+    return;
+  }
+
+  // No live worktree registered — make sure the path is free, then create one.
   cleanupWorktree();
 
   // Ensure base branch (main) exists locally so the new branch can fork from it.
@@ -65,6 +112,9 @@ export function cleanupWorktree(): void {
   run(["-C", REPO_PATH, "worktree", "remove", "--force", WORKTREE_PATH]);
   // Prune in case the directory was deleted out of band.
   run(["-C", REPO_PATH, "worktree", "prune"]);
+  // A leftover, unregistered directory would still make `worktree add` fail with
+  // "already exists"; remove it. Idempotent — ignore if it is already gone.
+  rmSync(WORKTREE_PATH, { recursive: true, force: true });
 }
 
 export function commitAll(message: string): string {
