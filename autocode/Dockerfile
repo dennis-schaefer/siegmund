@@ -1,13 +1,9 @@
-FROM maven:3.9-eclipse-temurin-25-alpine
+FROM node:24-alpine
 
-# System packages: node.js 24, git, github CLI, bash (for shebang lines used by claude)
-# Alpine ships current Node in the community repo; pin to v24.
 RUN apk add --no-cache \
         bash \
         git \
         github-cli \
-        nodejs \
-        npm \
         ca-certificates
 
 # Claude Code CLI — the agent engine.
