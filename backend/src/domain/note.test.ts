@@ -88,6 +88,14 @@ describe('parseNote(buildNote(e)) — round-trip is value-preserving', () => {
   });
 });
 
+describe('buildNote(parseNote(buildNote(e))) — writer cycle is idempotent', () => {
+  it.each(roundTripCases)('$label', ({ entry }) => {
+    const once = buildNote(entry);
+    const twice = buildNote(parseNote(once));
+    expect(twice).toBe(once);
+  });
+});
+
 // ── parseNote — no-frontmatter input ─────────────────────────────────────────
 
 const noFrontmatterCases: Array<{ label: string; text: string }> = [

@@ -8,9 +8,6 @@ export type Area = {
 };
 
 /**
- * RenderableArea — an Area enriched with display-time aggregate data
- * (e.g. entry count) for Hub indexes and UI listings.
+ * RenderableArea — an Area ready to be rendered into a Hub index or UI listing.
  */
-export type RenderableArea = Area & {
-  readonly entryCount: number;
-};
+export type RenderableArea = Area;

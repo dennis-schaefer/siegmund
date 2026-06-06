@@ -148,6 +148,13 @@ describe('parseFrontmatter — missing field defaults', () => {
     expect(parsed[field]).toBe(expected);
   });
 
+  it('treats a top-level YAML scalar as empty (isPlainObject fallback to {})', () => {
+    const parsed = parseFrontmatter('just a string');
+    expect(parsed.status).toBe('open');
+    expect(parsed.area).toBe('inbox');
+    expect(parsed.extras).toEqual({});
+  });
+
   it('all fields default on completely empty YAML', () => {
     const parsed = parseFrontmatter('');
     expect(parsed.id).toBe('');

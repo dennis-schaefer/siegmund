@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { RenderableArea } from './area.ts';
+import type { Area } from './area.ts';
 import { renderAreasIndex, renderHub } from './hub.ts';
 
 // ── renderHub ─────────────────────────────────────────────────────────────────
@@ -47,9 +47,9 @@ describe('renderHub — placeholder substitution', () => {
 // ── renderAreasIndex ──────────────────────────────────────────────────────────
 
 describe('renderAreasIndex', () => {
-  const areas: RenderableArea[] = [
-    { slug: 'haushalt', title: 'Haushalt', entryCount: 3 },
-    { slug: 'sw-projekt-x', title: 'SW Projekt X', entryCount: 7 },
+  const areas: Area[] = [
+    { slug: 'haushalt', title: 'Haushalt' },
+    { slug: 'sw-projekt-x', title: 'SW Projekt X' },
   ];
 
   it('renders each area using the default item template and joins by newline', () => {
@@ -87,9 +87,17 @@ describe('renderAreasIndex', () => {
     );
   });
 
+  it('accepts both itemTemplate and listPlaceholder overrides simultaneously', () => {
+    const result = renderAreasIndex(areas, 'LIST: {{myList}}', {
+      itemTemplate: '* {{areaTitle}}',
+      listPlaceholder: '{{myList}}',
+    });
+    expect(result).toBe('LIST: * Haushalt\n* SW Projekt X');
+  });
+
   it('does not recursively expand a title containing a placeholder pattern', () => {
-    const tricky: RenderableArea[] = [
-      { slug: 'real-slug', title: '{{areaSlug}}', entryCount: 0 },
+    const tricky: Area[] = [
+      { slug: 'real-slug', title: '{{areaSlug}}' },
     ];
     const result = renderAreasIndex(tricky, '{{areaList}}', {
       itemTemplate: '- {{areaTitle}} / {{areaSlug}}',

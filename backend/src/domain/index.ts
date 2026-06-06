@@ -15,12 +15,7 @@ export {
 
 export type { Area, RenderableArea } from './area.ts';
 
-export {
-  slugifyAreaName,
-  slugifyEntryContent,
-  slugifyText,
-  validateAreaName,
-} from './slugs.ts';
+export { slugifyAreaName, slugifyEntryContent, validateAreaName } from './slugs.ts';
 
 export { buildFrontmatter, parseFrontmatter } from './frontmatter.ts';
 export type { EntryFrontmatter } from './frontmatter.ts';

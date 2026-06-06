@@ -1,9 +1,4 @@
-import type { RenderableArea } from './area.ts';
-
-type HubArea = {
-  readonly title: string;
-  readonly slug: string;
-};
+import type { Area, RenderableArea } from './area.ts';
 
 const DEFAULT_ITEM_TEMPLATE = '- [[areas/{{areaSlug}}/_hub|{{areaTitle}}]]';
 const DEFAULT_LIST_PLACEHOLDER = '{{areaList}}';
@@ -25,7 +20,7 @@ function substituteOnce(template: string, substitutions: Record<string, string>)
  * Renders a Hub template for a single Area. Substitutes {{areaTitle}} and
  * {{areaSlug}}; unknown placeholders are left untouched.
  */
-export function renderHub(area: HubArea, template: string): string {
+export function renderHub(area: Area, template: string): string {
   return substituteOnce(template, { areaTitle: area.title, areaSlug: area.slug });
 }
 

@@ -39,6 +39,12 @@ describe('buildEntryId — Date and ISO-string equivalence', () => {
 // ── Criterion 4: segmentIndex suffix ──────────────────────────────────────────
 
 describe('buildEntryId — segmentIndex suffix', () => {
+  it('appends -1 when segmentIndex is 1 (minimum truthy value)', () => {
+    expect(buildEntryId({ text: TEXT, timestamp: OFFSET_ISO, segmentIndex: 1 })).toBe(
+      `${EXPECTED_BASE_ID}-1`,
+    );
+  });
+
   it('appends -2 when segmentIndex is 2', () => {
     expect(buildEntryId({ text: TEXT, timestamp: OFFSET_ISO, segmentIndex: 2 })).toBe(
       `${EXPECTED_BASE_ID}-2`,
