@@ -1,6 +1,5 @@
 ## Basic instructions
 - **ALWAYS** make file and code changes (comments, variable names, documentation, commit messages) **IN ENGLISH**, but always respond in the chat in the language I used for the request.
-- When reporting information to me, be extremely concise and sacrifice grammar for the sake of concision.
 
 ## Agent skills
 
