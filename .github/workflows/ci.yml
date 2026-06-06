@@ -1,0 +1,38 @@
+name: CI
+
+on:
+  workflow_call:
+
+jobs:
+  verify:
+    name: verify (${{ matrix.package }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - '@siegmund/backend'
+          - '@siegmund/mobile'
+          - '@siegmund/shared'
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter ${{ matrix.package }} run lint
+      - run: pnpm --filter ${{ matrix.package }} run typecheck
+      - run: pnpm --filter ${{ matrix.package }} run test
+
+  all-green:
+    name: all-green
+    if: always()
+    needs: [verify]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail if any matrix job failed
+        if: needs.verify.result != 'success'
+        run: exit 1
+      - run: echo "All CI checks passed"

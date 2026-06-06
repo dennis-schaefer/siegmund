@@ -1,0 +1,37 @@
+# Example deployment for the Siegmund backend.
+# Replace `dennis-schaefer` with your GitHub owner/org and pin a real version
+# tag (e.g. v1.2.3) instead of `latest` for reproducible deployments.
+services:
+  backend:
+    image: ghcr.io/dennis-schaefer/siegmund-backend:latest
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    environment:
+      # Agent lane: primary auth is the user's Anthropic subscription; this key
+      # is the fallback when subscription usage limits are hit (ADR-0003).
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      # Utility lane provider key (pick the one matching your configured
+      # provider). Only one is required.
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY}
+      # OPENAI_API_KEY: ${OPENAI_API_KEY}
+      # Non-secret runtime config (defaults baked into the image).
+      PORT: '3000'
+      HOST: '0.0.0.0'
+    volumes:
+      # SQLite operational state (job queue, device registry, scheduler state).
+      - sqlite-data:/data
+      # Vault git working clone the backend writes to and pushes from.
+      - vault-clone:/vault
+    healthcheck:
+      # The image already ships a node-based HEALTHCHECK; this mirrors it so the
+      # probe is visible in the compose file.
+      test: ['CMD', 'node', '/app/backend/healthcheck.mjs']
+      interval: 30s
+      timeout: 3s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  sqlite-data:
+  vault-clone:
