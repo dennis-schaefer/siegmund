@@ -12,3 +12,12 @@ export {
   MalformedFrontmatterError,
   ReservedAreaNameError,
 } from './errors.ts';
+
+export type { Area, RenderableArea } from './area.ts';
+
+export {
+  slugifyAreaName,
+  slugifyEntryContent,
+  slugifyText,
+  validateAreaName,
+} from './slugs.ts';
