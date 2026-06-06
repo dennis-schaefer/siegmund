@@ -30,3 +30,8 @@ export type { Entry } from './note.ts';
 
 export { buildEntryId } from './entry-id.ts';
 export type { BuildEntryIdInput } from './entry-id.ts';
+
+export { computeAreasIndexPath, computeEntryPath, computeHubPath } from './paths.ts';
+
+export { renderAreasIndex, renderHub } from './hub.ts';
+export type { RenderAreasIndexOptions } from './hub.ts';
