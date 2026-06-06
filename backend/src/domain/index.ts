@@ -21,3 +21,9 @@ export {
   slugifyText,
   validateAreaName,
 } from './slugs.ts';
+
+export { buildFrontmatter, parseFrontmatter } from './frontmatter.ts';
+export type { EntryFrontmatter } from './frontmatter.ts';
+
+export { buildNote, parseNote } from './note.ts';
+export type { Entry } from './note.ts';
