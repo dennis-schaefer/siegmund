@@ -5,6 +5,7 @@
 FROM node:26.3.0-alpine AS deps
 ENV PNPM_HOME=/pnpm
 ENV PATH=$PNPM_HOME:$PATH
+RUN npm install -g corepack
 RUN corepack enable
 WORKDIR /app
 COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
