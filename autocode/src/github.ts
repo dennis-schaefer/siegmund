@@ -74,6 +74,29 @@ export async function fetchPrdIssue(
   };
 }
 
+/**
+ * Create a PRD sub-issue from a review finding. The orchestrator owns the GitHub
+ * mutation (deterministic, testable) and writes the `## Parent` / `## Blocked by`
+ * sections itself; the finding only supplies title, body and label hints. Always
+ * labelled `ready-for-agent` so a later `agent run --issue <prd>` picks it up via
+ * the existing eligibility machinery. Returns the new issue number.
+ */
+export async function createSubIssue(
+  client: Octokit,
+  cfg: GithubConfig,
+  opts: { prdNumber: number; title: string; body: string; labels?: string[] },
+): Promise<number> {
+  const body = `${opts.body.trim()}\n\n## Parent\n#${opts.prdNumber}\n\n## Blocked by\nNone`;
+  const { data } = await client.issues.create({
+    owner: cfg.owner,
+    repo: cfg.repo,
+    title: opts.title,
+    body,
+    labels: ["ready-for-agent", ...(opts.labels ?? [])],
+  });
+  return data.number;
+}
+
 function parseBlockedBy(body: string): number[] {
   const match = body.match(/##\s*Blocked by\s*\n([\s\S]*?)(?=\n##\s|$)/i);
   if (!match) return [];

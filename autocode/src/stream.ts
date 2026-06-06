@@ -82,6 +82,8 @@ export interface StreamRenderer {
   write(chunk: string): void;
   /** Flush the buffer and print the final summary + result block. */
   finish(): void;
+  /** The agent's final text (the `result` event), as collected so far. */
+  result(): string;
 }
 
 export function createStreamRenderer(): StreamRenderer {
@@ -173,6 +175,9 @@ export function createStreamRenderer(): StreamRenderer {
       if (finalText.trim()) {
         process.stdout.write(`\n${finalText.trim()}\n`);
       }
+    },
+    result(): string {
+      return finalText;
     },
   };
 }
