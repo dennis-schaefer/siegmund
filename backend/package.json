@@ -12,6 +12,8 @@
   },
   "dependencies": {
     "@siegmund/shared": "workspace:*",
-    "fastify": "^5.1.0"
+    "@sindresorhus/slugify": "^3.0.0",
+    "fastify": "^5.1.0",
+    "yaml": "^2.9.0"
   }
 }
