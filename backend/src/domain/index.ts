@@ -27,3 +27,6 @@ export type { EntryFrontmatter } from './frontmatter.ts';
 
 export { buildNote, parseNote } from './note.ts';
 export type { Entry } from './note.ts';
+
+export { buildEntryId } from './entry-id.ts';
+export type { BuildEntryIdInput } from './entry-id.ts';
