@@ -21,7 +21,7 @@ function runClaude(
   userMessage: string,
   cwd: string,
   model: string,
-): Promise<void> {
+): Promise<string> {
   return new Promise((resolveP, rejectP) => {
     const child = spawn(
       "claude",
@@ -54,7 +54,7 @@ function runClaude(
     child.on("error", rejectP);
     child.on("exit", (code) => {
       renderer.finish();
-      if (code === 0) resolveP();
+      if (code === 0) resolveP(renderer.result());
       else rejectP(new Error(`claude exited with code ${code}`));
     });
     child.stdin.end(userMessage);
@@ -100,12 +100,112 @@ export async function runImplementationPhase(
   await runClaude(systemPrompt, userMessage, paths.workspace, model);
 }
 
+/** A single actionable improvement the review agent wants turned into a fix. */
+export interface Finding {
+  title: string;
+  body: string;
+  labels: string[];
+}
+
+/** Prompt-composition hints the orchestrator understands; anything else is dropped. */
+const KNOWN_FINDING_LABELS = ["backend", "frontend"] as const;
+
+/**
+ * The machine contract appended to `review.md` at runtime. Lives in code, next
+ * to `parseFindings`, so the schema and its parser are versioned together and
+ * cannot drift out of a hand-edited Markdown file.
+ */
+export const REVIEW_OUTPUT_CONTRACT = `## Machine-readable output (required)
+
+After the human-readable report above, emit **as the very last thing** exactly
+one fenced \`\`\`json block and nothing after it. It is the only part of your
+output that is parsed by a machine, so it must be valid JSON.
+
+Schema:
+
+\`\`\`json
+{
+  "findings": [
+    {
+      "title": "Imperative short title of the improvement",
+      "body": "What is wrong, where (file:symbol), and what the fix must achieve.\\n\\n## Acceptance criteria\\n- [ ] concrete, testable criterion\\n- [ ] a negative / boundary test where it applies",
+      "labels": ["backend"]
+    }
+  ]
+}
+\`\`\`
+
+Rules:
+- Every actionable improvement you found — including scope creep worth
+  reverting — becomes exactly one finding with testable acceptance criteria in
+  its \`body\`.
+- \`labels\` is an optional subset of ["backend","frontend"] used only as
+  prompt-composition hints. Do not add any other labels.
+- Do **not** write \`## Parent\` or \`## Blocked by\` — the orchestrator adds those.
+- Nothing to fix → emit \`{"findings": []}\`.`;
+
+/** Extract the body of the last \`\`\`json fenced block, or null if none. */
+function lastJsonFence(text: string): string | null {
+  const fence = /\`\`\`json\s*\n([\s\S]*?)\n\`\`\`/gi;
+  let match: RegExpExecArray | null;
+  let last: string | null = null;
+  while ((match = fence.exec(text)) !== null) {
+    last = match[1];
+  }
+  return last;
+}
+
+/**
+ * Parse the review agent's findings contract. Pure and tolerant: a missing or
+ * malformed JSON block yields `[]` plus a warning rather than crashing a run
+ * that has already done real work.
+ */
+export function parseFindings(text: string): Finding[] {
+  const raw = lastJsonFence(text);
+  if (raw === null) {
+    console.error("[autocode] WARNING — review produced no ```json block; treating as no findings.");
+    return [];
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    console.error("[autocode] WARNING — review's JSON block did not parse; treating as no findings.");
+    return [];
+  }
+
+  const findings = (parsed as { findings?: unknown })?.findings;
+  if (!Array.isArray(findings)) {
+    console.error("[autocode] WARNING — review JSON has no findings array; treating as no findings.");
+    return [];
+  }
+
+  const result: Finding[] = [];
+  for (const entry of findings) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const { title, body, labels } = entry as Record<string, unknown>;
+    if (typeof title !== "string" || title.trim().length === 0) continue;
+    if (typeof body !== "string" || body.trim().length === 0) continue;
+    const cleanLabels = Array.isArray(labels)
+      ? labels.filter(
+          (l): l is string =>
+            typeof l === "string" &&
+            (KNOWN_FINDING_LABELS as readonly string[]).includes(l),
+        )
+      : [];
+    result.push({ title: title.trim(), body: body.trim(), labels: cleanLabels });
+  }
+  return result;
+}
+
 export async function runReviewPhase(
   prd: IssueRef,
   diff: string,
   model: string,
-): Promise<void> {
-  const systemPrompt = await readPrompt("review.md");
+): Promise<Finding[]> {
+  const reviewMd = await readPrompt("review.md");
+  const systemPrompt = `${reviewMd}\n\n${REVIEW_OUTPUT_CONTRACT}`;
   const userMessage = [
     `# PRD #${prd.number} — ${prd.title}`,
     "",
@@ -119,7 +219,8 @@ export async function runReviewPhase(
     diff,
     "```",
   ].join("\n");
-  await runClaude(systemPrompt, userMessage, paths.workspace, model);
+  const output = await runClaude(systemPrompt, userMessage, paths.workspace, model);
+  return parseFindings(output);
 }
 
 export function closeIssue(

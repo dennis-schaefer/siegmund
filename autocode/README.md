@@ -149,6 +149,8 @@ AUTOCODE_MODEL=opus
   implementation, review). Short aliases (`opus`, `sonnet`, `haiku`) or full
   model IDs (`claude-opus-4-7`, `claude-sonnet-4-6`) both work. Override per
   run with `--model` on the CLI.
+- `AUTOCODE_REVIEW_MAX_ROUNDS` — max review→fix passes per run (default `3`).
+  Override per run with `--review-rounds <n>` on the CLI.
 
 Then build the image once:
 
@@ -175,6 +177,19 @@ Every `agent run` resolves the Claude model in this order:
 The same model is used for all three phases (plan, implementation, review).
 Accepted values are anything Claude Code accepts: short aliases (`opus`,
 `sonnet`, `haiku`) or full IDs (`claude-opus-4-7`, `claude-sonnet-4-6`, …).
+
+### Choosing the review→fix round limit
+
+The review phase is a bounded loop: review, file findings as sub-issues, fix
+them, review again. It resolves the max number of passes in the same order:
+
+1. `--review-rounds <n>` on the CLI (per-run override).
+2. `AUTOCODE_REVIEW_MAX_ROUNDS` from `.env`.
+3. Neither set → default `3`.
+
+On the final allowed pass, any findings are left as open `ready-for-agent`
+sub-issues instead of being fixed, so a later `agent run --issue <PRD>` resumes
+them via the normal eligibility machinery.
 
 ### Dry-run — plan only
 
@@ -217,8 +232,20 @@ What happens, in order:
    - Run `claude --print --system-prompt <composed> <issue title + body>`.
    - `git add -A && git commit -m "feat: <issue title> (closes #N)"`.
    - `gh issue close N --comment "Implemented in branch ..."` against your repo.
-6. Run the review agent on the full `main...HEAD` diff. The report is printed
-   to your terminal.
+6. Run the **review→fix loop** over the full `main...HEAD` diff (max
+   `--review-rounds` passes, default 3, or `AUTOCODE_REVIEW_MAX_ROUNDS`):
+   - The review agent prints its report and emits a machine-readable
+     `findings[]` list. Each finding is an actionable improvement with testable
+     acceptance criteria.
+   - Every finding is filed as an open `ready-for-agent` sub-issue of the PRD
+     (the durable record; a crashed run is resumable via a plain re-run).
+   - Unless this was the last allowed pass, each finding is fixed by a fresh
+     agent, committed as `fix: <title> (closes #N)`, and the issue is closed.
+     Then the loop reviews again.
+   - The loop stops when a review comes back clean (`findings[]` empty) or the
+     round limit is hit. Findings from the final, capped pass are **left as
+     open issues** — a later `agent run --issue <PRD>` picks them up
+     automatically. They are listed in the log.
 7. Remove the worktree (the branch and its commits remain).
 
 ### Inspecting the result on the host

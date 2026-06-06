@@ -4,6 +4,7 @@ import { Command } from "commander";
 import { computeEligibility } from "./eligibility.js";
 import {
   createClient,
+  createSubIssue,
   fetchPrdIssue,
   fetchSubIssues,
   readConfig,
@@ -40,11 +41,34 @@ agent
     "--model <name>",
     "Claude model to use (overrides the AUTOCODE_MODEL env var)",
   )
-  .action(async (opts: { issue: number; dryRun: boolean; model?: string }) => {
+  .option(
+    "--review-rounds <n>",
+    "Max review→fix passes (overrides AUTOCODE_REVIEW_MAX_ROUNDS; default 3)",
+    (v) => parseInt(v, 10),
+  )
+  .action(
+    async (opts: {
+      issue: number;
+      dryRun: boolean;
+      model?: string;
+      reviewRounds?: number;
+    }) => {
     const model = opts.model ?? process.env.AUTOCODE_MODEL;
     if (!model || model.trim().length === 0) {
       console.error(
         "[autocode] ERROR: no Claude model configured. Set AUTOCODE_MODEL in .env or pass --model <name>.",
+      );
+      process.exit(1);
+    }
+
+    const envRounds = process.env.AUTOCODE_REVIEW_MAX_ROUNDS;
+    const parsedEnvRounds =
+      envRounds && envRounds.trim().length > 0 ? parseInt(envRounds, 10) : undefined;
+    const maxRounds = opts.reviewRounds ?? parsedEnvRounds ?? 3;
+    if (!Number.isInteger(maxRounds) || maxRounds < 1) {
+      console.error(
+        "[autocode] ERROR: review rounds must be a positive integer (got " +
+          `${opts.reviewRounds ?? envRounds}).`,
       );
       process.exit(1);
     }
@@ -124,9 +148,57 @@ agent
         );
       }
 
-      console.error(`[autocode] review phase…`);
-      const diff = diffAgainst("main");
-      await runReviewPhase(prd, diff, model);
+      const repo = `${cfg.owner}/${cfg.repo}`;
+      for (let round = 1; ; round++) {
+        console.error(`[autocode] review phase (round ${round}/${maxRounds})…`);
+        const findings = await runReviewPhase(prd, diffAgainst("main"), model);
+        if (findings.length === 0) {
+          console.error("[autocode] review clean — nothing to fix.");
+          break;
+        }
+
+        // Persist every finding as an open sub-issue first: it is the durable
+        // record and makes a crashed run resumable via a plain re-run.
+        const created: { number: number; title: string; body: string; labels: string[] }[] = [];
+        for (const f of findings) {
+          const number = await createSubIssue(client, cfg, {
+            prdNumber: prd.number,
+            title: f.title,
+            body: f.body,
+            labels: f.labels,
+          });
+          created.push({ number, title: f.title, body: f.body, labels: f.labels });
+          console.error(`[autocode] filed fix issue #${number} — ${f.title}`);
+        }
+
+        if (round >= maxRounds) {
+          const nums = created.map((c) => `#${c.number}`).join(", ");
+          console.error(
+            `[autocode] max review rounds (${maxRounds}) reached — ` +
+              `${created.length} finding(s) left as open issues: ${nums}. ` +
+              `Re-run 'agent run --issue ${prd.number}' to pick them up.`,
+          );
+          break;
+        }
+
+        // Under the limit: fix each finding with a fresh subprocess, commit, close.
+        for (const issue of created) {
+          console.error(`[autocode] fixing #${issue.number} — ${issue.title}`);
+          await runImplementationPhase(
+            {
+              number: issue.number,
+              title: issue.title,
+              body: issue.body,
+              labels: issue.labels,
+              blockedBy: [],
+            },
+            model,
+          );
+          const sha = commitAll(`fix: ${issue.title} (closes #${issue.number})`);
+          console.error(`[autocode] committed ${sha}`);
+          closeIssue(repo, issue.number, branch, sha);
+        }
+      }
     } finally {
       console.error(`[autocode] cleaning up worktree…`);
       cleanupWorktree();
