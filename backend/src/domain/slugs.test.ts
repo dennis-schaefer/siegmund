@@ -146,8 +146,9 @@ describe('Area and RenderableArea types', () => {
     expect(area.title).toBe('Test');
   });
 
-  it('RenderableArea extends Area with entryCount', () => {
-    const renderable: RenderableArea = { slug: 'test', title: 'Test', entryCount: 3 };
-    expect(renderable.entryCount).toBe(3);
+  it('RenderableArea is assignable to Area', () => {
+    const renderable: RenderableArea = { slug: 'test', title: 'Test' };
+    expect(renderable.slug).toBe('test');
+    expect(renderable.title).toBe('Test');
   });
 });
